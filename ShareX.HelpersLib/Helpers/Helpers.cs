@@ -2,7 +2,7 @@
 
 /*
     ShareX - A program that allows you to take screenshots and share any file type
-    Copyright (c) 2007-2023 ShareX Team
+    Copyright (c) 2007-2025 ShareX Team
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -38,8 +38,6 @@ using System.Net.NetworkInformation;
 using System.Reflection;
 using System.Resources;
 using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
 using System.Security.Permissions;
 using System.Security.Principal;
@@ -277,14 +275,15 @@ namespace ShareX.HelpersLib
             return sb.ToString();
         }
 
-        /// <summary>
-        /// If version1 newer than version2 = 1
-        /// If version1 equal to version2 = 0
-        /// If version1 older than version2 = -1
-        /// </summary>
-        public static int CompareVersion(string version1, string version2)
+        public static string GetApplicationVersion(bool includeRevision = false)
         {
-            return NormalizeVersion(version1).CompareTo(NormalizeVersion(version2));
+            Version version = Version.Parse(Application.ProductVersion);
+            string result = $"{version.Major}.{version.Minor}.{version.Build}";
+            if (includeRevision)
+            {
+                result = $"{result}.{version.Revision}";
+            }
+            return result;
         }
 
         /// <summary>
@@ -292,9 +291,19 @@ namespace ShareX.HelpersLib
         /// If version1 equal to version2 = 0
         /// If version1 older than version2 = -1
         /// </summary>
-        public static int CompareVersion(Version version1, Version version2)
+        public static int CompareVersion(string version1, string version2, bool ignoreRevision = false)
         {
-            return version1.Normalize().CompareTo(version2.Normalize());
+            return NormalizeVersion(version1, ignoreRevision).CompareTo(NormalizeVersion(version2, ignoreRevision));
+        }
+
+        /// <summary>
+        /// If version1 newer than version2 = 1
+        /// If version1 equal to version2 = 0
+        /// If version1 older than version2 = -1
+        /// </summary>
+        public static int CompareVersion(Version version1, Version version2, bool ignoreRevision = false)
+        {
+            return version1.Normalize(ignoreRevision).CompareTo(version2.Normalize(ignoreRevision));
         }
 
         /// <summary>
@@ -302,14 +311,14 @@ namespace ShareX.HelpersLib
         /// If version equal to ApplicationVersion = 0
         /// If version older than ApplicationVersion = -1
         /// </summary>
-        public static int CompareApplicationVersion(string version)
+        public static int CompareApplicationVersion(string version, bool includeRevision = false)
         {
-            return CompareVersion(version, Application.ProductVersion);
+            return CompareVersion(version, GetApplicationVersion(includeRevision));
         }
 
-        public static Version NormalizeVersion(string version)
+        public static Version NormalizeVersion(string version, bool ignoreRevision = false)
         {
-            return Version.Parse(version).Normalize();
+            return Version.Parse(version).Normalize(ignoreRevision);
         }
 
         public static bool IsWindowsXP()
@@ -357,6 +366,12 @@ namespace ShareX.HelpersLib
             return OSVersion.Major >= 10 && OSVersion.Build >= build;
         }
 
+        public static bool IsWindows11OrGreater(int build = -1)
+        {
+            build = Math.Max(22000, build);
+            return OSVersion.Major >= 10 && OSVersion.Build >= build;
+        }
+
         public static bool IsDefaultInstallDir()
         {
             string path = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
@@ -378,17 +393,6 @@ namespace ShareX.HelpersLib
             int hours = (int)ts.TotalHours;
             if (hours > 0) time = hours + ":" + time;
             return time;
-        }
-
-        public static object Clone(object obj)
-        {
-            using (MemoryStream ms = new MemoryStream())
-            {
-                BinaryFormatter binaryFormatter = new BinaryFormatter(null, new StreamingContext(StreamingContextStates.Clone));
-                binaryFormatter.Serialize(ms, obj);
-                ms.Seek(0, SeekOrigin.Begin);
-                return binaryFormatter.Deserialize(ms);
-            }
         }
 
         public static void PlaySoundAsync(Stream stream)
@@ -619,21 +623,6 @@ namespace ShareX.HelpersLib
                 result += generator();
             }
             return result;
-        }
-
-        public static bool IsRunning(string name)
-        {
-            try
-            {
-                Mutex mutex = Mutex.OpenExisting(name);
-                mutex.ReleaseMutex();
-            }
-            catch
-            {
-                return false;
-            }
-
-            return true;
         }
 
         public static T ByteArrayToStructure<T>(byte[] bytes) where T : struct
@@ -873,24 +862,15 @@ namespace ShareX.HelpersLib
             using (MemoryStream ms = new MemoryStream())
             using (XmlTextWriter writer = new XmlTextWriter(ms, Encoding.Unicode))
             {
-                // Load the XmlDocument with the XML.
+                writer.Formatting = Formatting.Indented;
+
                 XmlDocument document = new XmlDocument();
                 document.LoadXml(xml);
-
-                writer.Formatting = System.Xml.Formatting.Indented;
-
-                // Write the XML into a formatting XmlTextWriter
                 document.WriteContentTo(writer);
                 writer.Flush();
                 ms.Flush();
-
-                // Have to rewind the MemoryStream in order to read its contents.
                 ms.Position = 0;
-
-                // Read MemoryStream contents into a StreamReader.
                 StreamReader sReader = new StreamReader(ms);
-
-                // Extract the text from the StreamReader.
                 return sReader.ReadToEnd();
             }
         }
@@ -902,28 +882,48 @@ namespace ShareX.HelpersLib
 
         public static Icon GetProgressIcon(int percentage, Color color)
         {
-            percentage = percentage.Clamp(0, 99);
+            percentage = percentage.Clamp(0, 100);
 
             Size size = SystemInformation.SmallIconSize;
+
             using (Bitmap bmp = new Bitmap(size.Width, size.Height))
             using (Graphics g = Graphics.FromImage(bmp))
             {
+                using (Brush brush = new SolidBrush(Color.FromArgb(39, 39, 39)))
+                {
+                    g.FillRectangle(brush, 0, 0, size.Width, size.Height);
+                }
+
                 int y = (int)(size.Height * (percentage / 100f));
 
                 if (y > 0)
                 {
                     using (Brush brush = new SolidBrush(color))
                     {
-                        g.FillRectangle(brush, 0, size.Height - 1 - y, size.Width, y);
+                        g.FillRectangle(brush, 0, size.Height - y, size.Width, y);
+                    }
+
+                    if (y < size.Height)
+                    {
+                        using (Pen pen = new Pen(ColorHelpers.LighterColor(color, 0.3f)))
+                        {
+                            g.DrawLine(pen, 0, size.Height - y, size.Width - 1, size.Height - y);
+                        }
                     }
                 }
 
                 using (Font font = new Font("Arial", 10))
                 using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 {
-                    g.DrawString(percentage.ToString(), font, Brushes.Black, size.Width / 2f, size.Height / 2f, sf);
-                    g.DrawString(percentage.ToString(), font, Brushes.White, size.Width / 2f, (size.Height / 2f) - 1, sf);
+                    percentage = percentage.Clamp(0, 99);
+
+                    g.DrawString(percentage.ToString(), font, Brushes.White, size.Width / 2f, size.Height / 2f, sf);
                 }
+
+                bmp.SetPixel(0, 0, Color.Transparent);
+                bmp.SetPixel(bmp.Width - 1, 0, Color.Transparent);
+                bmp.SetPixel(0, bmp.Height - 1, Color.Transparent);
+                bmp.SetPixel(bmp.Width - 1, bmp.Height - 1, Color.Transparent);
 
                 return Icon.FromHandle(bmp.GetHicon());
             }
@@ -998,6 +998,46 @@ namespace ShareX.HelpersLib
             }
 
             return true;
+        }
+
+        public static string GetDesktopWallpaperFilePath()
+        {
+            byte[] transcodedImageCache = (byte[])RegistryHelpers.GetValue(@"Control Panel\Desktop", "TranscodedImageCache");
+            byte[] transcodedImageCacheDest = new byte[transcodedImageCache.Length - 24];
+            Array.Copy(transcodedImageCache, 24, transcodedImageCacheDest, 0, transcodedImageCacheDest.Length);
+            string wallpaperFilePath = Encoding.Unicode.GetString(transcodedImageCacheDest);
+            return wallpaperFilePath.TrimEnd('\0');
+        }
+
+        public static IEnumerable<int> Range(int from, int to, int increment = 1)
+        {
+            if (increment == 0)
+            {
+                throw new ArgumentException("Increment cannot be zero.", nameof(increment));
+            }
+
+            if (from == to)
+            {
+                yield return from;
+                yield break;
+            }
+
+            increment = Math.Abs(increment);
+
+            if (from < to)
+            {
+                for (int i = from; i <= to; i += increment)
+                {
+                    yield return i;
+                }
+            }
+            else
+            {
+                for (int i = from; i >= to; i -= increment)
+                {
+                    yield return i;
+                }
+            }
         }
     }
 }

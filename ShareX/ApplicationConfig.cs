@@ -2,7 +2,7 @@
 
 /*
     ShareX - A program that allows you to take screenshots and share any file type
-    Copyright (c) 2007-2023 ShareX Team
+    Copyright (c) 2007-2025 ShareX Team
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -72,14 +72,14 @@ namespace ShareX
         public HotkeyType TrayLeftDoubleClickAction = HotkeyType.OpenMainWindow;
         public HotkeyType TrayMiddleClickAction = HotkeyType.ClipboardUploadWithContentViewer;
 
+        public bool AutoCheckUpdate = true;
+        public UpdateChannel UpdateChannel = UpdateChannel.Release;
+        // TEMP: For backward compatibility
         public bool CheckPreReleaseUpdates = false;
 
         #endregion General
 
         #region Theme
-
-        // TEMP: For backward compatibility
-        public bool UseDarkTheme = true;
 
         public bool UseCustomTheme = true;
         public List<ShareXTheme> Themes = ShareXTheme.GetDefaultThemes();
@@ -149,7 +149,7 @@ namespace ShareX
         public bool HistoryCheckURL = false;
 
         public RecentTask[] RecentTasks = null;
-        public bool RecentTasksSave = true;
+        public bool RecentTasksSave = false;
         public int RecentTasksMaxCount = 10;
         public bool RecentTasksShowInMainWindow = true;
         public bool RecentTasksShowInTrayMenu = true;
@@ -168,12 +168,6 @@ namespace ShareX
         #endregion Print
 
         #region Advanced
-
-        [Category("Application"), DefaultValue(true), Description("Automatically check updates.")]
-#if STEAM || MicrosoftStore
-        [Browsable(false)]
-#endif
-        public bool AutoCheckUpdate { get; set; }
 
         [Category("Application"), DefaultValue(false), Description("Calculate and show file sizes in binary units (KiB, MiB etc.)")]
         public bool BinaryUnits { get; set; }
