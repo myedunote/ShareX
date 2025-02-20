@@ -2,7 +2,7 @@
 
 /*
     ShareX - A program that allows you to take screenshots and share any file type
-    Copyright (c) 2007-2023 ShareX Team
+    Copyright (c) 2007-2025 ShareX Team
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -35,7 +35,7 @@ namespace ShareX.HelpersLib
         public MonitorTestForm()
         {
             InitializeComponent();
-            ShareXResources.ApplyTheme(this);
+            ShareXResources.ApplyTheme(this, true);
 
             Rectangle screenBounds = CaptureHelpers.GetScreenBounds();
             Location = screenBounds.Location;
@@ -187,15 +187,7 @@ namespace ShareX.HelpersLib
 
         #region Form events
 
-        private void MainForm_KeyUp(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Escape)
-            {
-                Close();
-            }
-        }
-
-        private void MainForm_MouseDown(object sender, MouseEventArgs e)
+        private void MonitorTestForm_MouseDown(object sender, MouseEventArgs e)
         {
             bool visible = !pSettings.Visible;
             if (visible) pSettings.Location = e.Location;
